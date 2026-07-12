@@ -1,8 +1,14 @@
+import React from "react";
 import OrgSetup from "./components/OrgSetup";
-import React from 'react';
-import { Container, Typography, Box } from '@mui/material';
+import AssetDirectory from "./components/AssetDirectory";
 
 function App() {
-  return <OrgSetup />;
+  return (
+    <>
+      <OrgSetup />
+      <AssetDirectory />
+    </>
+  );
 }
+
 export default App;
