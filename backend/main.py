@@ -248,3 +248,38 @@ def update_maintenance_status(request_id: int, update: MaintenanceUpdate):
 @app.get("/api/maintenance")
 def get_maintenance_requests():
     return fake_maintenance_requests
+
+from datetime import datetime
+
+# --- Dashboard & Analytics Endpoints ---
+@app.get("/api/dashboard")
+def get_dashboard_kpis():
+    # Count asset statuses
+    available_count = sum(1 for a in fake_db_assets if a["status"] == "Available")
+    allocated_count = sum(1 for a in fake_db_assets if a["status"] == "Allocated")
+    maintenance_count = sum(1 for a in fake_db_assets if a["status"] == "Under Maintenance")
+    
+    # Calculate Overdue Returns (Expected return date is in the past)
+    overdue_count = 0
+    current_time = datetime.now()
+    
+    for alloc in fake_allocations:
+        if alloc["status"] == "Active" and alloc["expected_return_date"]:
+            try:
+                # Basic string to datetime conversion for hackathon purposes
+                exp_date = datetime.strptime(alloc["expected_return_date"], "%Y-%m-%d")
+                if current_time > exp_date:
+                    overdue_count += 1
+            except ValueError:
+                pass # Skip if date format is weird during testing
+
+    # Count active bookings
+    active_bookings = sum(1 for b in fake_bookings if b["status"] == "Upcoming")
+
+    return {
+        "assets_available": available_count,
+        "assets_allocated": allocated_count,
+        "maintenance_today": maintenance_count,
+        "active_bookings": active_bookings,
+        "overdue_returns": overdue_count
+    }
