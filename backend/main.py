@@ -11,9 +11,14 @@ class AssetCreate(BaseModel):
     category: str
     location: str
 
-fake_db_assets = []
-asset_counter = 1
-
+# --- Dummy Database ---
+fake_db_assets = [
+    {"asset_tag": "AF-0001", "name": "MacBook Pro M2", "category": "Electronics", "status": "Available", "is_bookable": False, "location": "HQ"},
+    {"asset_tag": "AF-0002", "name": "Dell XPS 15", "category": "Electronics", "status": "Allocated", "is_bookable": False, "location": "HQ"},
+    {"asset_tag": "AF-0003", "name": "Conference Room B", "category": "Facilities", "status": "Available", "is_bookable": True, "location": "Floor 2"},
+    {"asset_tag": "AF-0004", "name": "Projector 4K", "category": "Electronics", "status": "Under Maintenance", "is_bookable": True, "location": "IT Room"}
+]
+asset_counter = 5
 @app.post("/api/assets")
 def register_asset(asset: AssetCreate):
     global asset_counter
@@ -283,3 +288,51 @@ def get_dashboard_kpis():
         "active_bookings": active_bookings,
         "overdue_returns": overdue_count
     }
+
+# --- Pydantic Models for Audits ---
+class AuditRecord(BaseModel):
+    asset_tag: str
+    status: str # "Verified", "Missing", "Damaged"
+
+class AuditCycleCreate(BaseModel):
+    name: str
+    records: list[AuditRecord]
+
+fake_audits = []
+audit_counter = 1
+
+# --- Audit Endpoints ---
+@app.post("/api/audits")
+def submit_audit_cycle(audit: AuditCycleCreate):
+    global audit_counter
+    discrepancies = []
+    
+    for record in audit.records:
+        # Find the asset
+        asset = next((a for a in fake_db_assets if a["asset_tag"] == record.asset_tag), None)
+        
+        if asset:
+            # If it's missing or damaged, it's a discrepancy
+            if record.status in ["Missing", "Damaged"]:
+                discrepancies.append({
+                    "asset_tag": record.asset_tag,
+                    "reported_status": record.status,
+                    "previous_status": asset["status"]
+                })
+                # Auto-update the master asset status
+                if record.status == "Missing":
+                    asset["status"] = "Lost"
+                elif record.status == "Damaged":
+                    asset["status"] = "Under Maintenance"
+
+    new_audit = {
+        "id": audit_counter,
+        "name": audit.name,
+        "discrepancies_found": len(discrepancies),
+        "discrepancy_report": discrepancies,
+        "status": "Closed"
+    }
+    fake_audits.append(new_audit)
+    audit_counter += 1
+    
+    return new_audit
