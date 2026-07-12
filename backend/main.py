@@ -188,3 +188,63 @@ def create_booking(req: BookingCreate):
 @app.get("/api/bookings")
 def get_bookings():
     return fake_bookings
+
+# --- Pydantic Models for Maintenance ---
+class MaintenanceCreate(BaseModel):
+    asset_tag: str
+    issue_description: str
+    priority: str
+
+class MaintenanceUpdate(BaseModel):
+    status: str # "Approved", "Resolved", "Rejected"
+
+fake_maintenance_requests = []
+maintenance_counter = 1
+
+# --- Maintenance Endpoints ---
+@app.post("/api/maintenance")
+def raise_maintenance_request(req: MaintenanceCreate):
+    global maintenance_counter
+    
+    # 1. Verify asset exists
+    asset = next((a for a in fake_db_assets if a["asset_tag"] == req.asset_tag), None)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
+    # 2. Create the request
+    new_request = {
+        "id": maintenance_counter,
+        "asset_tag": req.asset_tag,
+        "issue_description": req.issue_description,
+        "priority": req.priority,
+        "status": "Pending"
+    }
+    fake_maintenance_requests.append(new_request)
+    maintenance_counter += 1
+    
+    return new_request
+
+@app.put("/api/maintenance/{request_id}")
+def update_maintenance_status(request_id: int, update: MaintenanceUpdate):
+    # 1. Find the request
+    request = next((r for r in fake_maintenance_requests if r["id"] == request_id), None)
+    if not request:
+        raise HTTPException(status_code=404, detail="Maintenance request not found")
+        
+    # 2. Find the associated asset
+    asset = next((a for a in fake_db_assets if a["asset_tag"] == request["asset_tag"]), None)
+    
+    # 3. Update request status
+    request["status"] = update.status
+    
+    # 4. Auto-update Asset Status based on workflow rules
+    if update.status == "Approved" and asset:
+        asset["status"] = "Under Maintenance"
+    elif update.status == "Resolved" and asset:
+        asset["status"] = "Available"
+        
+    return request
+
+@app.get("/api/maintenance")
+def get_maintenance_requests():
+    return fake_maintenance_requests
