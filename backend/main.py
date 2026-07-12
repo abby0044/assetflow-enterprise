@@ -83,3 +83,51 @@ def register_user(user: UserCreate):
 @app.get("/api/users")
 def get_users():
     return fake_db_users
+
+from fastapi import HTTPException
+
+# --- Pydantic Models for Allocation ---
+class AllocationCreate(BaseModel):
+    asset_tag: str
+    user_id: int
+    expected_return_date: str
+
+fake_allocations = []
+allocation_counter = 1
+
+# --- Allocation Endpoints ---
+@app.post("/api/allocations")
+def allocate_asset(req: AllocationCreate):
+    global allocation_counter
+    
+    # 1. Find the asset in our fake_db
+    asset = next((a for a in fake_db_assets if a["asset_tag"] == req.asset_tag), None)
+    
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
+    # 2. THE CONFLICT RULE: Check if it's already allocated
+    if asset["status"] != "Available":
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Conflict: Asset is currently {asset['status']} and cannot be allocated."
+        )
+        
+    # 3. Update asset status and create allocation record
+    asset["status"] = "Allocated"
+    
+    new_allocation = {
+        "id": allocation_counter,
+        "asset_tag": req.asset_tag,
+        "user_id": req.user_id,
+        "expected_return_date": req.expected_return_date,
+        "status": "Active"
+    }
+    fake_allocations.append(new_allocation)
+    allocation_counter += 1
+    
+    return new_allocation
+
+@app.get("/api/allocations")
+def get_allocations():
+    return fake_allocations
