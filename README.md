@@ -148,6 +148,7 @@ assetflow/
 ## Team
 
 * Aaditya Paul
+* Abhivayakti Satti
 
 ---
 
