@@ -9,17 +9,25 @@ import {
   TableRow,
   Paper,
   Chip,
+  Button,
 } from "@mui/material";
+
+import AllocationModal from "./AllocationModal";
 
 export default function AssetDirectory() {
   const [assets, setAssets] = useState([]);
+  const [openModal, setOpenModal] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState("");
 
-  useEffect(() => {
-    // Fetch assets from backend API
+  const fetchAssets = () => {
     fetch("http://localhost:8000/api/assets")
       .then((res) => res.json())
       .then((data) => setAssets(data))
-      .catch((err) => console.error("Error fetching assets:", err));
+      .catch((err) => console.error(err));
+  };
+
+  useEffect(() => {
+    fetchAssets();
   }, []);
 
   const getChipColor = (status) => {
@@ -35,12 +43,16 @@ export default function AssetDirectory() {
       case "Lost":
         return "error";
       case "Retired":
-        return "default";
       case "Disposed":
         return "default";
       default:
         return "default";
     }
+  };
+
+  const handleAllocateClick = (assetTag) => {
+    setSelectedAsset(assetTag);
+    setOpenModal(true);
   };
 
   return (
@@ -60,14 +72,21 @@ export default function AssetDirectory() {
               <TableCell>
                 <strong>Asset Tag</strong>
               </TableCell>
+
               <TableCell>
                 <strong>Name</strong>
               </TableCell>
+
               <TableCell>
                 <strong>Category</strong>
               </TableCell>
+
               <TableCell>
                 <strong>Status</strong>
+              </TableCell>
+
+              <TableCell>
+                <strong>Action</strong>
               </TableCell>
             </TableRow>
           </TableHead>
@@ -75,7 +94,7 @@ export default function AssetDirectory() {
           <TableBody>
             {assets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} align="center">
+                <TableCell align="center" colSpan={5}>
                   No assets registered yet.
                 </TableCell>
               </TableRow>
@@ -83,8 +102,11 @@ export default function AssetDirectory() {
               assets.map((asset) => (
                 <TableRow key={asset.asset_tag}>
                   <TableCell>{asset.asset_tag}</TableCell>
+
                   <TableCell>{asset.name}</TableCell>
+
                   <TableCell>{asset.category}</TableCell>
+
                   <TableCell>
                     <Chip
                       label={asset.status}
@@ -92,12 +114,32 @@ export default function AssetDirectory() {
                       size="small"
                     />
                   </TableCell>
+
+                  <TableCell>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={asset.status !== "Available"}
+                      onClick={() =>
+                        handleAllocateClick(asset.asset_tag)
+                      }
+                    >
+                      Allocate
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </Paper>
+
+      <AllocationModal
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+        assetTag={selectedAsset}
+        onSuccess={fetchAssets}
+      />
     </Box>
   );
 }
