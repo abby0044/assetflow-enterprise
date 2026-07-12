@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 app = FastAPI(title="AssetFlow API")
+@app.get("/")
+def read_root():
+    return {"message": "AssetFlow API is running perfectly, bro!"}
 
 class AssetCreate(BaseModel):
     name: str
@@ -131,3 +134,57 @@ def allocate_asset(req: AllocationCreate):
 @app.get("/api/allocations")
 def get_allocations():
     return fake_allocations
+
+from datetime import datetime
+from fastapi import HTTPException
+
+# --- Pydantic Models for Bookings ---
+class BookingCreate(BaseModel):
+    asset_tag: str
+    user_id: int
+    start_time: datetime
+    end_time: datetime
+
+fake_bookings = []
+booking_counter = 1
+
+# --- Booking Endpoints ---
+@app.post("/api/bookings")
+def create_booking(req: BookingCreate):
+    global booking_counter
+    
+    # 1. Verify the asset exists and is bookable
+    asset = next((a for a in fake_db_assets if a["asset_tag"] == req.asset_tag), None)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    if not asset.get("is_bookable"):
+        raise HTTPException(status_code=400, detail="This asset is not a shared/bookable resource.")
+
+    # 2. THE OVERLAP RULE: Check against existing bookings for this asset
+    for booking in fake_bookings:
+        if booking["asset_tag"] == req.asset_tag and booking["status"] != "Cancelled":
+            # Check for overlap: new start < existing end AND new end > existing start
+            if req.start_time < booking["end_time"] and req.end_time > booking["start_time"]:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Conflict: This resource is already booked during the requested time slot."
+                )
+                
+    # 3. Create the booking
+    new_booking = {
+        "id": booking_counter,
+        "asset_tag": req.asset_tag,
+        "user_id": req.user_id,
+        "start_time": req.start_time,
+        "end_time": req.end_time,
+        "status": "Upcoming"
+    }
+    fake_bookings.append(new_booking)
+    booking_counter += 1
+    
+    return new_booking
+
+@app.get("/api/bookings")
+def get_bookings():
+    return fake_bookings
